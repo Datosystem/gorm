@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"gorm.io/gorm"
-	"gorm.io/gorm/schema"
-	. "gorm.io/gorm/utils/tests"
+	"github.com/Datosystem/gorm"
+	"github.com/Datosystem/gorm/schema"
+	. "github.com/Datosystem/gorm/utils/tests"
 )
 
 type SerializerStruct struct {

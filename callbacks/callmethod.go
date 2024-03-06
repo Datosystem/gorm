@@ -4,7 +4,7 @@ import (
 	"context"
 	"reflect"
 
-	"gorm.io/gorm"
+	"github.com/Datosystem/gorm"
 )
 
 func callMethod(db *gorm.DB, fc func(value interface{}, tx *gorm.DB) bool) {

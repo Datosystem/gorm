@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"gorm.io/gorm"
-	. "gorm.io/gorm/utils/tests"
+	"github.com/Datosystem/gorm"
+	. "github.com/Datosystem/gorm/utils/tests"
 )
 
 func TestCount(t *testing.T) {

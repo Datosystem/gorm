@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"reflect"
 
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
-	"gorm.io/gorm/schema"
-	"gorm.io/gorm/utils"
+	"github.com/Datosystem/gorm"
+	"github.com/Datosystem/gorm/clause"
+	"github.com/Datosystem/gorm/schema"
+	"github.com/Datosystem/gorm/utils"
 )
 
 func preload(tx *gorm.DB, rel *schema.Relationship, conds []interface{}, preloads map[string][]interface{}) error {

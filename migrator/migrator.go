@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
-	"gorm.io/gorm/logger"
-	"gorm.io/gorm/schema"
+	"github.com/Datosystem/gorm"
+	"github.com/Datosystem/gorm/clause"
+	"github.com/Datosystem/gorm/logger"
+	"github.com/Datosystem/gorm/schema"
 )
 
 var (

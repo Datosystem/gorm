@@ -10,11 +10,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Datosystem/gorm"
+	"github.com/Datosystem/gorm/logger"
+	"github.com/Datosystem/gorm/schema"
+	. "github.com/Datosystem/gorm/utils/tests"
 	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
-	"gorm.io/gorm/schema"
-	. "gorm.io/gorm/utils/tests"
 )
 
 func TestMigrate(t *testing.T) {
