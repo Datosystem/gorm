@@ -1,12 +1,14 @@
 package tests_test
 
 import (
+	"fmt"
 	"regexp"
 	"sort"
 	"testing"
 
 	"github.com/Datosystem/gorm"
 	. "github.com/Datosystem/gorm/utils/tests"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestJoins(t *testing.T) {
@@ -184,20 +186,22 @@ func TestJoinCount(t *testing.T) {
 	DB.Create(&user)
 
 	query := DB.Model(&User{}).Joins("Company")
-	// Bug happens when .Count is called on a query.
-	// Removing the below two lines or downgrading to gorm v1.20.12 will make this test pass.
+
 	var total int64
 	query.Count(&total)
 
 	var result User
 
-	// Incorrectly generates a 'SELECT *' query which causes companies.id to overwrite users.id
 	if err := query.First(&result, user.ID).Error; err != nil {
 		t.Fatalf("Failed, got error: %v", err)
 	}
 
 	if result.ID != user.ID {
 		t.Fatalf("result's id, %d, doesn't match user's id, %d", result.ID, user.ID)
+	}
+	// should find company
+	if result.Company.ID != *user.CompanyID {
+		t.Fatalf("result's id, %d, doesn't match user's company id, %d", result.Company.ID, *user.CompanyID)
 	}
 }
 
@@ -324,4 +328,151 @@ func TestJoinArgsWithDB(t *testing.T) {
 		t.Fatal("Pet ID can not be empty")
 	}
 	AssertEqual(t, user4.NamedPet.Name, "")
+}
+
+func TestNestedJoins(t *testing.T) {
+	users := []User{
+		{
+			Name: "nested-joins-1",
+			Manager: &User{
+				Name: "nested-joins-manager-1",
+				Company: Company{
+					Name: "nested-joins-manager-company-1",
+				},
+				NamedPet: &Pet{
+					Name: "nested-joins-manager-namepet-1",
+					Toy: Toy{
+						Name: "nested-joins-manager-namepet-toy-1",
+					},
+				},
+			},
+			NamedPet: &Pet{Name: "nested-joins-namepet-1", Toy: Toy{Name: "nested-joins-namepet-toy-1"}},
+		},
+		{
+			Name:     "nested-joins-2",
+			Manager:  GetUser("nested-joins-manager-2", Config{Company: true, NamedPet: true}),
+			NamedPet: &Pet{Name: "nested-joins-namepet-2", Toy: Toy{Name: "nested-joins-namepet-toy-2"}},
+		},
+	}
+
+	DB.Create(&users)
+
+	var userIDs []uint
+	for _, user := range users {
+		userIDs = append(userIDs, user.ID)
+	}
+
+	var users2 []User
+	if err := DB.
+		Joins("Manager").
+		Joins("Manager.Company").
+		Joins("Manager.NamedPet").
+		Joins("Manager.NamedPet.Toy").
+		Joins("NamedPet").
+		Joins("NamedPet.Toy").
+		Find(&users2, "users.id IN ?", userIDs).Error; err != nil {
+		t.Fatalf("Failed to load with joins, got error: %v", err)
+	} else if len(users2) != len(users) {
+		t.Fatalf("Failed to load join users, got: %v, expect: %v", len(users2), len(users))
+	}
+
+	sort.Slice(users2, func(i, j int) bool {
+		return users2[i].ID > users2[j].ID
+	})
+
+	sort.Slice(users, func(i, j int) bool {
+		return users[i].ID > users[j].ID
+	})
+
+	for idx, user := range users {
+		// user
+		CheckUser(t, user, users2[idx])
+		if users2[idx].Manager == nil {
+			t.Fatalf("Failed to load Manager")
+		}
+		// manager
+		CheckUser(t, *user.Manager, *users2[idx].Manager)
+		// user pet
+		if users2[idx].NamedPet == nil {
+			t.Fatalf("Failed to load NamedPet")
+		}
+		CheckPet(t, *user.NamedPet, *users2[idx].NamedPet)
+		// manager pet
+		if users2[idx].Manager.NamedPet == nil {
+			t.Fatalf("Failed to load NamedPet")
+		}
+		CheckPet(t, *user.Manager.NamedPet, *users2[idx].Manager.NamedPet)
+	}
+}
+
+func TestJoinsPreload_Issue7013(t *testing.T) {
+	manager := &User{Name: "Manager"}
+	DB.Create(manager)
+
+	var userIDs []uint
+	for i := 0; i < 21; i++ {
+		user := &User{Name: fmt.Sprintf("User%d", i), ManagerID: &manager.ID}
+		DB.Create(user)
+		userIDs = append(userIDs, user.ID)
+	}
+
+	var entries []User
+	assert.NotPanics(t, func() {
+		assert.NoError(t,
+			DB.Debug().Preload("Manager.Team").
+				Joins("Manager.Company").
+				Find(&entries).Error)
+	})
+}
+
+func TestJoinsPreload_Issue7013_RelationEmpty(t *testing.T) {
+	type (
+		Furniture struct {
+			gorm.Model
+			OwnerID *uint
+		}
+
+		Owner struct {
+			gorm.Model
+			Furnitures []Furniture
+			CompanyID  *uint
+			Company    Company
+		}
+
+		Building struct {
+			gorm.Model
+			Name    string
+			OwnerID *uint
+			Owner   Owner
+		}
+	)
+
+	DB.Migrator().DropTable(&Building{}, &Owner{}, &Furniture{})
+	DB.Migrator().AutoMigrate(&Building{}, &Owner{}, &Furniture{})
+
+	home := &Building{Name: "relation_empty"}
+	DB.Create(home)
+
+	var entries []Building
+	assert.NotPanics(t, func() {
+		assert.NoError(t,
+			DB.Debug().Preload("Owner.Furnitures").
+				Joins("Owner.Company").
+				Find(&entries).Error)
+	})
+
+	AssertEqual(t, entries, []Building{{Model: home.Model, Name: "relation_empty", Owner: Owner{Company: Company{}}}})
+}
+
+func TestJoinsPreload_Issue7013_NoEntries(t *testing.T) {
+	var entries []User
+	assert.NotPanics(t, func() {
+		assert.NoError(t,
+			DB.Debug().Preload("Manager.Team").
+				Joins("Manager.Company").
+				Where("1 <> 1").
+				Find(&entries).Error)
+	})
+
+	AssertEqual(t, len(entries), 0)
 }

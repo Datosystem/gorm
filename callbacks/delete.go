@@ -133,15 +133,7 @@ func Delete(config *Config) func(db *gorm.DB) {
 				column, values := schema.ToQueryValues(db.Statement.Table, db.Statement.Schema.PrimaryFieldDBNames, queryValues)
 
 				if len(values) > 0 {
-					for _, val := range values {
-						if vals, ok := val.([]interface{}); ok {
-							for index, help := range vals {
-								db.Statement.AddClause(clause.Where{Exprs: []clause.Expression{clause.Eq{Column: column.([]clause.Column)[index].Name, Value: help}}})
-							}
-						} else {
-							db.Statement.AddClause(clause.Where{Exprs: []clause.Expression{clause.IN{Column: column, Values: values}}})
-						}
-					}
+					db.Statement.AddClause(clause.Where{Exprs: []clause.Expression{clause.IN{Column: column, Values: values}}})
 				}
 
 				if db.Statement.ReflectValue.CanAddr() && db.Statement.Dest != db.Statement.Model && db.Statement.Model != nil {
